@@ -50,7 +50,7 @@ str(instacart)
 The `cart_data` contains information on over 3 million online grocery orders from more than 200,000 Instacart users. Instacart is an online grocery service that allows customers to shop online from local stores. This dataset contains `r nrow(instacart)` observations of `r ncol(instacart)` variables. Examples of such variables include `reordered`, a binary variable indicating if an item has been ordered by this user in the past, and `order_dow`, the day of the week on which the order was placed. 
 
 ```{r}
-#Number of ailes 
+#Number of aisles 
 length(unique(unlist(instacart[c("aisle")])))
 
 #n_distinct(pull(instacart, aisle_id))
@@ -104,8 +104,77 @@ There are 134 aisles in the supermarket. Most items are ordered from the fresh v
 ##Problem 2
 
 ```{r}
+library(p8105.datasets)
+data("brfss_smart2010")
 
+str(brfss_smart2010)
+head(brfss_smart2010)
 
+#Cleaning 
+
+brfss_cleaned = brfss_smart2010 %>%
+  janitor::clean_names() %>%
+  filter(topic == "Overall Health") %>% 
+  filter(response %in% c("Excellent", "Very good", "Good", "Fair", "Poor")) %>%
+  mutate(
+    response = forcats::fct_relevel(response, c("Poor", "Fair", "Good", "Very good", "Excellent"))
+  ) %>% 
+  view()
+
+#Answering questions 
+
+brfss_2002 = 
+  brfss_cleaned %>%
+  filter(year == 2002) %>% 
+  group_by(locationabbr) %>% 
+  summarize(n = n()) %>%
+  filter(n >= 7)
+
+list(pull(brfss_2002, locationabbr))
+
+brfss_2010 = 
+  brfss_cleaned %>%
+  filter(year == 2010) %>%
+  group_by(locationabbr) %>% 
+  summarize(n = n()) %>%
+  filter(n >= 7) 
+
+list(pull(brfss_2010, locationabbr))
+
+brfss_excellent = 
+  brfss_cleaned %>%
+  select(response, year, locationabbr, data_value) %>%
+  filter(response == "Excellent") %>% 
+  group_by(locationabbr) %>% 
+  mutate(
+    mean_dv = mean(data_value)
+  ) %>%
+  select(-data_value) %>%
+  distinct() %>%
+  view()
+ 
+spaghetti_plot = brfss_excellent %>% 
+  ggplot(aes(x = year, y = mean_dv, group = locationabbr)) + geom_line()
+spaghetti_plot
+
+brfss_NY = 
+  brfss_cleaned %>%
+  filter(year == "2006" | year == "2010") %>%
+  filter(locationabbr == "NY") %>%
+  select(response, year, locationdesc, data_value) %>%
+  group_by(response) %>% 
+  mutate(
+    mean_dv = mean(data_value)
+  ) %>%
+  select(-data_value) %>%
+  distinct() %>%
+  view()
+
+NY_plot = brfss_NY %>% 
+  ggplot(aes(x = response, y = mean_dv, group = locationdesc)) +
+  geom_point() 
+
+NY_plot
 ```
 
 ##Problem 3
