@@ -7,6 +7,7 @@ output: github_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(dplyr)
 library(viridis)
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -23,6 +24,93 @@ scale_colour_discrete = scale_colour_viridis_d
 scale_fill_discrete = scale_fill_viridis_d
 theme_set(theme_minimal() + theme(legend.position = "bottom"))
 ```
+
+
+##Problem 1
+
+The goal is to do some exploration of this dataset. To that end, write a short description of the dataset, noting the size and structure of the data, describing some key variables, and giving illstrative examples of observations. Then, do or answer the following (commenting on the results of each):
+
+How many aisles are there, and which aisles are the most items ordered from?
+
+Make a plot that shows the number of items ordered in each aisle, limiting this to aisles with more than 10000 items ordered. Arrange aisles sensibly, and organize your plot so others can read it.
+
+Make a table showing the three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”. Include the number of times each item is ordered in your table.
+
+Make a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week; format this table for human readers (i.e. produce a 2 x 7 table).
+
+```{r}
+library(p8105.datasets)
+data("instacart")
+instacart
+head(instacart)
+str(instacart)
+
+```
+
+The `cart_data` contains information on over 3 million online grocery orders from more than 200,000 Instacart users. Instacart is an online grocery service that allows customers to shop online from local stores. This dataset contains `r nrow(instacart)` observations of `r ncol(instacart)` variables. Examples of such variables include `reordered`, a binary variable indicating if an item has been ordered by this user in the past, and `order_dow`, the day of the week on which the order was placed. 
+
+```{r}
+#Number of ailes 
+length(unique(unlist(instacart[c("aisle")])))
+
+#n_distinct(pull(instacart, aisle_id))
+
+#Most items ordered from which aisles 
+instacart %>% 
+   group_by(aisle) %>% 
+   summarize(n = n()) %>%
+   mutate(
+     ranking = min_rank(desc(n))
+   ) %>% 
+   filter(ranking < 4)
+
+#Aisles with more than 1000 items ordered 
+instacart %>% 
+   group_by(aisle) %>% 
+   summarize(n = n()) %>%
+   filter(n > 10000) %>%
+   ggplot(aes(x = aisle, y = n)) + geom_col()
+  
+
+#Three most popular items
+instacart %>%
+   filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>%
+   group_by(aisle, product_name) %>%
+   summarize(n = n()) %>%
+   mutate(ranking = rank(-n)) %>% 
+   filter(ranking <= 3) %>% 
+   arrange(aisle, ranking) %>% 
+   knitr::kable(digits = 1) 
+
+#Apples and coffee
+instacart %>% 
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>%
+  group_by(product_name, order_dow) %>% 
+  summarize(
+  mean_hr = mean(order_hour_of_day)) %>% 
+  pivot_wider(
+  names_from = order_dow,
+  values_from = mean_hr
+  ) %>%
+  knitr::kable()
+
+```
+
+
+There are 134 aisles in the supermarket. Most items are ordered from the fresh vegetables (150609), fresh fruits (150473), and packaged vegetables/fruits (78493) ailes. 
+
+
+
+##Problem 2
+
+```{r}
+
+
+```
+
+##Problem 3
+
+```{r}
 
 ```
 
