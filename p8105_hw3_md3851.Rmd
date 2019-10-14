@@ -28,7 +28,6 @@ theme_set(theme_minimal() + theme(legend.position = "bottom"))
 
 ##Problem 1
 
-
 ```{r}
 library(p8105.datasets)
 data("instacart")
@@ -105,7 +104,6 @@ instacart %>%
 This table shows the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week. On most days (except for day 5), and on average, coffee ice cream is ordered later in the afternoon than pink lady apples. This makes sense as ice cream tends to be an afternoon craving. 
 
 
-
 ##Problem 2
 
 ```{r}
@@ -115,19 +113,21 @@ data("brfss_smart2010")
 str(brfss_smart2010)
 head(brfss_smart2010)
 
-#Cleaning 
-
+#Cleaned dataset
 brfss_cleaned = brfss_smart2010 %>%
   janitor::clean_names() %>%
   filter(topic == "Overall Health") %>% 
   filter(response %in% c("Excellent", "Very good", "Good", "Fair", "Poor")) %>%
   mutate(
     response = forcats::fct_relevel(response, c("Poor", "Fair", "Good", "Very good", "Excellent"))
-  ) %>% 
-  view()
+  ) 
+brfss_cleaned
+```
 
-#Answering questions 
+This data is from the Behavioral Risk Factors Surveillance System for Selected Metropolitan Area Risk Trends (SMART) for 2002-2010. BRFSS is a continuous, state-based surveillance system that collects information about modifiable risk factors for chronic diseases and other leading causes of death. This particular subset has been restricted to focus on overall health. 
 
+```{r} 
+ 
 brfss_2002 = 
   brfss_cleaned %>%
   filter(year == 2002) %>% 
@@ -146,35 +146,42 @@ brfss_2010 =
 
 list(pull(brfss_2010, locationabbr))
 
+```
+
+In 2002, there were 36 states that appeared in 7 locations vs 45 in 2010. 
+
+```{r}
 brfss_excellent = 
   brfss_cleaned %>%
-  select(response, year, locationabbr, data_value) %>%
-  filter(response == "Excellent") %>% 
-  group_by(locationabbr, year) %>% 
-  mutate(
-    mean_dv = mean(data_value)
-  ) %>%
-  select(-data_value) %>%
-  distinct() %>%
-  view()
- 
-spaghetti_plot = brfss_excellent %>% 
-  ggplot(aes(x = year, y = mean_dv, group = locationabbr, color = locationabbr)) + geom_line()
-spaghetti_plot
+  filter(response == "Excellent") %>%
+  group_by(locationabbr, year) %>%
+  summarize(data_value_mean = mean(data_value)) %>%
+  ggplot(aes(x = year, y = data_value_mean, group = locationabbr, color = locationabbr)) +
+  geom_line() +
+  labs(
+    x = "Year",
+    y = "Mean Data Value",
+    title = "Mean Data Value for Excellent Responses by Year for U.S. States"
+    )
 
+brfss_excellent
+```
+
+There does not seem to be distinguishable trends regarding the changes in mean data value for excellent responses between states or over time. However, the state of WY had two particularly low mean data values for excellent responses in 2005 and 2009. 
+
+```{r}
 brfss_NY = 
   brfss_cleaned %>%
-  filter(year == "2006" | year == "2010") %>%
-  filter(locationabbr == "NY") %>%
-  select(response, year, locationdesc, data_value) 
-  
-brfss_NY %>% 
+  filter(locationabbr == "NY", year == "2006" | year == "2010") %>%
   ggplot(aes(x = response, y = data_value)) +
-  geom_boxplot() + 
-  facet_grid (year ~ locationdesc)
+  geom_col() +
+  facet_grid(~year) +
+  labs(x = "Response", y = "Data Value", title = "Data Value by Response at NY locations in 2006 and 2010")
 
-#NY_plot
+brfss_NY
 ```
+
+There were notable increases in the proportion of "Good", "Very good", and "Excellent" responses given across NY locations between 2006 and 2010. 
 
 ##Problem 3
 
@@ -185,22 +192,66 @@ pivot_longer(
   activity_1:activity_1440,
   names_to = "minute",
   names_prefix = "activity_",
-  values_to = "activity_counts"
-  )%>%
-  mutate(weekend = if_else(day == "Saturday" | day == "Sunday", "weekend", "weekday"))
+  values_to = "activity_count"
+  ) %>%
+  mutate(
+    minute = as.numeric(minute),
+    day = as.factor(day),
+    day = forcats::fct_relevel(day, c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")),
+    day_type  = if_else(day == "Saturday" | day == "Sunday", "weekend", "weekday"))
 
-view(accel_data)
+accel_data
+```
 
+This dataset contains five weeks of accelerometer data collected on a 63 year-old male with BMI 25, who was admitted to the Advanced Cardiac Care Center of Columbia University Medical Center and diagnosed with congestive heart failure (CHF). It contains `r nrow(accel_data)` observations of `r ncol(accel_data)` variables. The week variables indicates ranges from 1 to 5 and indicates which of the weeks the observation was selected from. The day_id variables attributes a unique number to each day of the monitoring period. The day variable indicates which day from Monday through Friday the observation was recorded on. The minute variable ranges from 1 to 1440 and specifies which minute of each day the observation refers to. The activity_count variable indicates the subject's avtivity count at each minute. The day_type variable indicates whether the observation was collected on a weekday or on a weekend. 
+
+
+```{r}
 daily_data =
   accel_data %>% 
   group_by(day_id) %>% 
   mutate(
-    daily_activity = sum(activity_counts)
+    daily_activity = sum(activity_count)
   )%>%
-  select(day_id, day, weekend, daily_activity)%>%
-  distinct()
+  select(day_id, day, day_type, daily_activity)%>%
+  distinct()%>%
+  arrange(daily_activity)%>%
+  knitr::kable()
   
-view(daily_data)
+daily_data
 
 ```
 
+I would have anticipated that the days with the lowest level of activity would be weekend days, but it appears that one of the days with the highest level of activity (631105 counts) was a Sunday. 
+
+```{r}
+#First plot
+accel_data %>%
+mutate(
+  hour = minute %/% 60,
+  hour = as.integer(hour),
+  unique_day = paste(week, day)  
+  ) %>%
+  group_by(unique_day, hour) %>%
+  summarize(mean_activity_count = mean(activity_count)) %>%
+  ggplot(
+    aes(x = hour, y = mean_activity_count, color = unique_day)) + 
+    geom_line() + 
+    labs(x = "Hour", y = "Mean Activity Count", title = "24-hour Activity Time Course by Unique Day")
+
+#Second plot
+accel_data %>%
+mutate(
+  hour = minute %/% 60,
+  hour = as.integer(hour),
+  ) %>%
+  group_by(day, hour) %>%
+  summarize(mean_activity_count = mean(activity_count)) %>%
+  ggplot(
+    aes(x = hour, y = mean_activity_count, color = day)) + 
+    geom_line() + 
+    labs(x = "Hour", y = "Mean Activity Count", title = "24-hour Activity Time Course by Day of Week")
+
+```
+
+The two graphs above show lower levels of activity at night (when we are expecting the subject to be sleeping) and higher levels of activity during the day. In addition, peaks of activity are observed around 11am and 8pm, which could be associated with cooking meals. There are no striking differences between weekend vs week days. 
